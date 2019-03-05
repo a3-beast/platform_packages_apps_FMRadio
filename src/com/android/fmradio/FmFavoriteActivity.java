@@ -16,17 +16,20 @@
 
 package com.android.fmradio;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import android.Manifest;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
-import android.location.Location;
-import android.location.LocationManager;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -66,9 +69,7 @@ public class FmFavoriteActivity extends Activity {
 
     public static final String ACTIVITY_RESULT = "ACTIVITY_RESULT";
 
-    private static final String SHOW_GPS_DIALOG = "SHOW_GPS_DIALOG";
-
-    private static final String GPS_NOT_LOCATED_DIALOG = "GPS_NOT_LOCATED_DIALOG";
+    private static final int PERMISSION_REQUEST_CODE_LOCATION = 100;
 
     private ListView mLvFavorites = null; // list view
 
@@ -84,11 +85,11 @@ public class FmFavoriteActivity extends Activity {
 
     private MenuItem mMenuRefresh = null;
 
-    private LocationManager mLocationManager;
-
-    private Location mCurLocation;
-
     private boolean mIsActivityForeground = true;
+
+    private Toast mToast = null;
+
+    private boolean mIsBackPressed = false;
 
     /**
      * on create
@@ -97,6 +98,7 @@ public class FmFavoriteActivity extends Activity {
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+            Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         // Bind the activity to FM audio stream.
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
@@ -106,7 +108,6 @@ public class FmFavoriteActivity extends Activity {
         ActionBar actionBar = getActionBar();
         actionBar.setTitle(getString(R.string.station_title));
         actionBar.setDisplayHomeAsUpEnabled(true);
-        mLocationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         mContext = getApplicationContext();
 
         mMyAdapter = new MyFavoriteAdapter(mContext);
@@ -127,13 +128,19 @@ public class FmFavoriteActivity extends Activity {
              */
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                int frequency = mMyAdapter.getStationFreq(position);
-                if (frequency != -1) {
-                    Intent intentResult = new Intent();
-                    intentResult.putExtra(ACTIVITY_RESULT, frequency);
-                    setResult(RESULT_OK, intentResult);
-                    finish();
+                // Set the selected frequency to main UI and finish the
+                // favorite manager.
+                TextView textView = (TextView) view.findViewById(R.id.lv_station_freq);
+                float frequency = 0;
+                try {
+                    frequency = Float.parseFloat(textView.getText().toString());
+                } catch (NumberFormatException e) {
+                    e.printStackTrace();
                 }
+                Intent intentResult = new Intent();
+                intentResult.putExtra(ACTIVITY_RESULT, FmUtils.computeStation(frequency));
+                setResult(RESULT_OK, intentResult);
+                finish();
             }
         });
 
@@ -164,39 +171,13 @@ public class FmFavoriteActivity extends Activity {
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+            Log.d(TAG, "onOptionsItemSelected, item = " + item.getItemId());
         switch (item.getItemId()) {
             case android.R.id.home:
                 onBackPressed();
                 break;
             case R.id.fm_station_list_refresh:
-                if (null != mService) {
-                    refreshMenuItem(false);
-
-                    mMyAdapter.swipResult(null);
-                    mLvFavorites.setEmptyView(mSearchTips);
-                    mSearchProgress.setIndeterminate(true);
-
-                    // If current location and last location exceed defined distance, delete the RDS database
-                    if (isGpsOpen()) {
-                        mCurLocation = mLocationManager
-                                .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                        if (mCurLocation != null) {
-                            double[] lastLocations = FmUtils.getLastSearchedLocation(mContext);
-                            float distance[] = new float[2];
-                            Location.distanceBetween(lastLocations[0], lastLocations[1],
-                                    mCurLocation.getLatitude(), mCurLocation.getLongitude(),
-                                    distance);
-                            float searchedDistance = distance[0];
-                            boolean exceed =
-                                    searchedDistance > FmUtils.LOCATION_DISTANCE_EXCEED;
-                            mService.setDistanceExceed(exceed);
-                            FmUtils.setLastSearchedLocation(mContext, mCurLocation.getLatitude(),
-                                    mCurLocation.getLongitude());
-                        }
-                    }
-
-                    mService.startScanAsync();
-                }
+                refreshList();
                 break;
             default:
                 break;
@@ -206,12 +187,15 @@ public class FmFavoriteActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+            Log.d(TAG, "onBackPressed");
         if (null == mService) {
             Log.w(TAG, "onBackPressed, mService is null");
         } else {
             boolean isScanning = mService.isScanning();
             if (isScanning) {
                 mService.stopScan();
+                mIsBackPressed = true;
+                return;
             }
         }
         super.onBackPressed();
@@ -219,6 +203,7 @@ public class FmFavoriteActivity extends Activity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+            Log.d(TAG, "onCreateOptionsMenu");
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.fm_station_list_menu, menu);
         mMenuRefresh = menu.findItem(R.id.fm_station_list_refresh);
@@ -362,21 +347,13 @@ public class FmFavoriteActivity extends Activity {
             }
             return convertView;
         }
-
-        private int getStationFreq(int position) {
-            if (mCursor != null && mCursor.moveToPosition(position)) {
-                final int stationFreq = mCursor.getInt(mCursor
-                        .getColumnIndex(FmStation.Station.FREQUENCY));
-                return stationFreq;
-            }
-            return -1;
-        }
     }
 
     /**
      * Add searched station as favorite station
      */
     public void addFavorite(int stationFreq) {
+            Log.d(TAG, "addFavorite");
         // TODO it's on UI thread, change to sub thread
         // update the station name and station type in database
         // according the frequency
@@ -388,6 +365,7 @@ public class FmFavoriteActivity extends Activity {
      * Delete favorite from favorite station list, make it as searched station
      */
     public void deleteFavorite(int stationFreq) {
+            Log.d(TAG, "deleteFavorite");
         // TODO it's on UI thread, change to sub thread
         // update the station type from favorite to searched.
         FmStation.removeFromFavorite(mContext, stationFreq);
@@ -396,6 +374,7 @@ public class FmFavoriteActivity extends Activity {
 
     @Override
     protected void onResume() {
+            Log.d(TAG, "onResume");
         super.onResume();
         mIsActivityForeground = true;
         if (null != mService) {
@@ -408,6 +387,7 @@ public class FmFavoriteActivity extends Activity {
 
     @Override
     protected void onPause() {
+            Log.d(TAG, "onPause");
         mIsActivityForeground = false;
         if (null != mService) {
             mService.setFmMainActivityForeground(mIsActivityForeground);
@@ -428,6 +408,7 @@ public class FmFavoriteActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+            Log.d(TAG, "onDestroy");
         mMyAdapter.swipResult(null);
         FmService.unregisterExitListener(mExitListener);
         if (mService != null) {
@@ -495,6 +476,12 @@ public class FmFavoriteActivity extends Activity {
                     if (searchedNum == 0) {
                         Toast.makeText(mContext, getString(R.string.toast_cannot_search),
                                 Toast.LENGTH_SHORT).show();
+                        if (mIsBackPressed) {
+                            Log.d(TAG, "back was pressed, so finishing activity");
+                            mIsBackPressed = false;
+                            finish();
+                            return;
+                        }
                         // searched station is zero, if db has station, should not use empty.
                         if (mMyAdapter.getCount() == 0) {
                             View emptyView = (View) findViewById(R.id.empty_tips);
@@ -544,8 +531,8 @@ public class FmFavoriteActivity extends Activity {
         @Override
         public void onServiceConnected(ComponentName className, IBinder service) {
             mService = ((FmService.ServiceBinder) service).getService();
+                Log.d(TAG, "onServiceConnected, mService = " + mService);
             if (null == mService) {
-                Log.e(TAG, "onServiceConnected, mService is null");
                 finish();
                 return;
             }
@@ -556,14 +543,20 @@ public class FmFavoriteActivity extends Activity {
             }
             // FmUtils.isFirstEnterStationList() must be called at the first time.
             // After it is called, it will save status to SharedPreferences.
-            if (FmUtils.isFirstEnterStationList(mContext) || (0 == mMyAdapter.getCount())) {
+            // If have started scanning, don't scan again, this always happen when
+            // Activity recreate with no station.
+            boolean isScan = mService.isScanning();
+            if ((FmUtils.isFirstEnterStationList(mContext) || (0 == mMyAdapter.getCount()))
+                    && !isScan) {
                 refreshMenuItem(false);
                 mLvFavorites.setEmptyView(mSearchTips);
                 mSearchProgress.setIndeterminate(true);
                 mMyAdapter.swipResult(null);
+                // should hide no station view before starting scanning
+                View emptyView = (View) findViewById(R.id.empty_tips);
+                emptyView.setVisibility(View.GONE);
                 mService.startScanAsync();
             } else {
-                boolean isScan = mService.isScanning();
                 if (isScan) {
                     mMyAdapter.swipResult(null);
                     mLvFavorites.setEmptyView(mSearchTips);
@@ -583,15 +576,71 @@ public class FmFavoriteActivity extends Activity {
          */
         @Override
         public void onServiceDisconnected(ComponentName className) {
+        Log.d(TAG, "onServiceDisconnected");
         }
     };
 
-    /**
-     * check gps is open or not
-     *
-     * @return true is open
-     */
-    private boolean isGpsOpen() {
-        return mLocationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+
+    private void refreshList() {
+        int recordAudioPermission = checkSelfPermission(Manifest.permission.RECORD_AUDIO);
+
+        List<String> mPermissionStrings = new ArrayList<String>();
+        boolean mRequest = false;
+
+        if (recordAudioPermission != PackageManager.PERMISSION_GRANTED) {
+            mPermissionStrings.add(Manifest.permission.RECORD_AUDIO);
+            mRequest = true;
+        }
+        if (mRequest == true) {
+            String[] mPermissionList = new String[mPermissionStrings.size()];
+            mPermissionList = mPermissionStrings.toArray(mPermissionList);
+            requestPermissions(mPermissionList, PERMISSION_REQUEST_CODE_LOCATION);
+            return;
+        }
+        if (null != mService) {
+            refreshMenuItem(false);
+
+            mMyAdapter.swipResult(null);
+            mLvFavorites.setEmptyView(mSearchTips);
+            mSearchProgress.setIndeterminate(true);
+
+            // should hide no station view before starting scanning
+            View emptyView = (View) findViewById(R.id.empty_tips);
+            emptyView.setVisibility(View.GONE);
+            mService.startScanAsync();
+        }
     }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        if (requestCode == PERMISSION_REQUEST_CODE_LOCATION) {
+            boolean granted = true;
+            boolean mShowPermission = true;
+            for (int counter = 0; counter < permissions.length; counter++) {
+                boolean permissionGranted = (grantResults[counter] ==
+                                             PackageManager.PERMISSION_GRANTED);
+                granted = granted && permissionGranted;
+                if (!permissionGranted) {
+                    mShowPermission = mShowPermission && shouldShowRequestPermissionRationale(
+                                      permissions[counter]);
+                }
+            }
+            Log.i(TAG, "<onRequestPermissionsResult> Location permission granted" + granted);
+            if (granted == true) {
+                refreshList();
+            } else if (!mShowPermission) {
+                showToast(getString(R.string.missing_required_permission));
+            }
+        }
+    }
+
+    private void showToast(CharSequence text) {
+        if (null == mToast) {
+            mToast = Toast.makeText(mContext, text, Toast.LENGTH_SHORT);
+        }
+        mToast.setText(text);
+        mToast.show();
+    }
+
 }

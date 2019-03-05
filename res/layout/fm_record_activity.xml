@@ -45,7 +45,7 @@
                 android:singleLine="true"
                 android:text="@string/timer_default"
                 android:textColor="#607D8B"
-                android:textSize="88sp" />
+                android:textSize="88dp" />
 
             <TextView
                 android:id="@+id/minutes_label"
@@ -57,7 +57,7 @@
                 android:singleLine="true"
                 android:text="@string/minutes_label"
                 android:textColor="#607D8B"
-                android:textSize="24sp" />
+                android:textSize="24dp" />
 
             <TextView
                 android:id="@+id/seconds"
@@ -67,7 +67,7 @@
                 android:singleLine="true"
                 android:text="@string/timer_default"
                 android:textColor="#607D8B"
-                android:textSize="88sp" />
+                android:textSize="88dp" />
 
             <TextView
                 android:id="@+id/seconds_label"
@@ -78,14 +78,14 @@
                 android:singleLine="true"
                 android:text="@string/seconds_label"
                 android:textColor="#607D8B"
-                android:textSize="24sp" />
+                android:textSize="24dp" />
         </LinearLayout>
     </LinearLayout>
 
     <RelativeLayout
         android:id="@+id/station_detail"
         android:layout_width="match_parent"
-        android:layout_height="60dip"
+        android:layout_height="70dip"
         android:layout_gravity="bottom"
         android:layout_marginBottom="@dimen/fm_recording_station_detail_margin_bottom"
         android:layout_marginEnd="16dip"
@@ -109,7 +109,7 @@
                 android:fontFamily="sans-serif"
                 android:singleLine="true"
                 android:textColor="#000000"
-                android:textSize="24sp" />
+                android:textSize="24dp" />
 
             <LinearLayout
                 android:id="@+id/station_name_rt"
@@ -130,7 +130,7 @@
                     android:fontFamily="sans-serif-medium"
                     android:singleLine="true"
                     android:textColor="#000000"
-                    android:textSize="14sp" />
+                    android:textSize="14dp" />
 
                 <TextView
                     android:id="@+id/radio_text"
@@ -142,7 +142,7 @@
                     android:fontFamily="sans-serif"
                     android:singleLine="true"
                     android:textColor="#000000"
-                    android:textSize="14sp" />
+                    android:textSize="14dp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -185,7 +185,7 @@
             android:fontFamily="sans-serif-medium"
             android:text="@string/stop_record"
             android:textColor="#000000"
-            android:textSize="14sp" />
+            android:textSize="14dp" />
     </LinearLayout>
 
 </LinearLayout>

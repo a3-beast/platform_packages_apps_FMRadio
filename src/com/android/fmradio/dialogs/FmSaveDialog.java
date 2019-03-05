@@ -101,6 +101,7 @@ public class FmSaveDialog extends DialogFragment {
         if (savedInstanceState != null) {
             mRecordingNameToSave = savedInstanceState.getString("record_file_name");
             mDefaultRecordingName = savedInstanceState.getString("record_default_name");
+            mTempRecordingName = savedInstanceState.getString("record_temp_name");
             mRecordingSdcard = FmService.getRecordingSdcard();
         }
         setStyle(STYLE_NO_TITLE, 0);
@@ -134,9 +135,11 @@ public class FmSaveDialog extends DialogFragment {
         super.onResume();
         // have define in fm_recorder_dialog.xml length at most
         // 250(maxFileLength - suffixLength)
+        mRecordingNameEditText.requestFocus();
+        setTextChangedCallback();
         if (mDefaultRecordingName != null) {
             if (null != mRecordingNameToSave) {
-                // this case just for,fragment recreate
+                // this case just for fragment recreate
                 mRecordingNameEditText.setText(mRecordingNameToSave);
                 if ("".equals(mRecordingNameToSave)) {
                     mButtonSave.setEnabled(false);
@@ -146,8 +149,6 @@ public class FmSaveDialog extends DialogFragment {
             }
         }
 
-        mRecordingNameEditText.requestFocus();
-        setTextChangedCallback();
         Dialog dialog = getDialog();
         dialog.setCanceledOnTouchOutside(false);
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
@@ -158,6 +159,7 @@ public class FmSaveDialog extends DialogFragment {
     public void onSaveInstanceState(Bundle outState) {
         outState.putString("record_file_name", mRecordingNameToSave);
         outState.putString("record_default_name", mDefaultRecordingName);
+        outState.putString("record_temp_name", mTempRecordingName);
         super.onSaveInstanceState(outState);
     }
 
@@ -192,8 +194,10 @@ public class FmSaveDialog extends DialogFragment {
                         || recordName.startsWith(".")
                         || recordName.matches(".*[/\\\\:*?\"<>|\t].*")) {
                     mButtonSave.setEnabled(false);
+                    mButtonSave.setAlpha((float) 0.26); // set alpha 0.26 when button disable
                 } else {
                     mButtonSave.setEnabled(true);
+                    mButtonSave.setAlpha((float) 1); // restore alpha to default when enable
                 }
 
                 mRecordingNameToSave = mRecordingNameEditText.getText().toString().trim();

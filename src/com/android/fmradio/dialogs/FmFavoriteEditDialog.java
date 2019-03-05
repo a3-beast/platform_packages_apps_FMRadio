@@ -27,6 +27,7 @@ import android.text.Selection;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 
@@ -119,8 +120,18 @@ public class FmFavoriteEditDialog extends DialogFragment {
         super.onResume();
         setTextChangedCallback();
         String toName = mStationNameEditor.getText().toString();
-        // empty or blank or white space only name is not allowed
-        toggleSaveButton(toName != null && TextUtils.getTrimmedLength(toName) > 0);
+        // empty or blank or white space only name is not allowed, and call setText to
+        // trigger onTextChanged callback to check edittext's text whether be allowed
+        if (TextUtils.isEmpty(toName)) {
+            toggleSaveButton(false);
+        } else {
+            mStationNameEditor.setText(toName);
+        }
+
+        Dialog dialog = getDialog();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
     }
 
     /**
@@ -144,8 +155,15 @@ public class FmFavoriteEditDialog extends DialogFragment {
              */
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                // empty or blank or white space only name is not allowed
-                toggleSaveButton(TextUtils.getTrimmedLength(s) > 0);
+                boolean isEnabled = true;
+                String recordName = s.toString().trim();
+                // Characters not allowed by file system, and don't use as station name
+                if (recordName.length() <= 0
+                        || recordName.startsWith(".")
+                        || recordName.matches(".*[/\\\\:*?\"<>|\t].*")) {
+                    isEnabled = false;
+                }
+                toggleSaveButton(isEnabled);
             }
         });
     }

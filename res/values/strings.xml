@@ -115,4 +115,52 @@
     <string name="toast_listen">LISTEN</string>
     <!-- Snackbar message shown after we rename a favorite station [CHAR LIMIT=50] -->
     <string name="toast_station_renamed">The station has been renamed</string>
+
+    <!-- For Em Rx -->
+    <string name="FMR_Freq_text" translatable="false">Freq(MHz)</string>
+    <string name="FMR_Freq_tune" translatable="false">Tune</string>
+    <string name="FMR_Antenna_text" translatable="false">Antenna Type</string>
+    <string name="FMR_Antenna_short" translatable="false">Short</string>
+    <string name="FMR_Antenna_long" translatable="false">EarPhone</string>
+    <string name="FMR_Status_text" translatable="false">Status</string>
+    <string name="FMR_Force_Stereomono_text" translatable="false">Force Set:</string>
+    <string name="FMR_Status_Stereomono_text" translatable="false">Stereo/Mono:</string>
+    <string name="FMR_Stereomono_stereo" translatable="false">Stereo</string>
+    <string name="FMR_Stereomono_mono" translatable="false">Mono</string>
+    <string name="FMR_Status_Stereomono" translatable="false">detecting...</string>
+    <string name="FMR_Status_RSSI_text" translatable="false">RSSI(dBm):</string>
+    <string name="FMR_Status_RSSI" translatable="false">detecting...</string>
+    <string name="FMR_Status_Caparray_text" translatable="false">CapArray(pF):</string>
+    <string name="FMR_Status_Caparray" translatable="false">detecting...</string>
+    <string name="FMR_RDS_text" translatable="false">RDS</string>
+    <string name="FMR_RDS_Ratio_text" translatable="false">Ratio:</string>
+    <string name="FMR_RDS_Ratio" translatable="false">detecting...</string>
+    <string name="FMR_RDS_PS_text" translatable="false">PS:</string>
+    <string name="FMR_RDS_PS" translatable="false">None.</string>
+    <string name="FMR_RDS_RT_text" translatable="false">RT:</string>
+    <string name="FMR_RDS_RT" translatable="false">None.</string>
+    <string name="FMR_Hardware_version" translatable="false">Hardware Version</string>
+    <string name="FMR_Chip_ID_text" translatable="false">Chip ID</string>
+    <string name="FMR_Chip_ID" translatable="false">None.</string>
+    <string name="FMR_ECO_Version_text" translatable="false">ECO Version</string>
+    <string name="FMR_ECO_Version" translatable="false">None.</string>
+    <string name="FMR_Patch_Version_text" translatable="false">Patch Version</string>
+    <string name="FMR_Patch_Version" translatable="false">None.</string>
+    <string name="FMR_DSP_Version_text" translatable="false">DSP Version</string>
+    <string name="FMR_DSP_Version" translatable="false">None.</string>
+    <string name="FMR_EM_RSSI_THRESHOLD_text" translatable="false">RSSI THRESHOLD</string>
+    <string name="FMR_EM_MUTE_GAIN_text" translatable="false">SMG</string>
+    <string name="FMR_EM_DESENSE_RSSI_text" translatable="false">Desense RSSI</string>
+    <string name="FMR_EM_OK_TEXT" translatable="false">OK</string>
+    <string name="FMR_EM_CMD_text" translatable="false">0X</string>
+    <string name="FMR_EM_CMD_title" translatable="false">CMD EXPAND</string>
+    <string name="FMR_EM_CMD_return" translatable="false">CMD EXPAND RETURN VALUE</string>
+    <string name="FMR_EM_DEFAULT_VALUE" translatable="false">0</string>
+    <!-- Runtime Permission -->
+    <string name="missing_required_permission" translatable="false">Permissions denied. You can change them in Settings > Apps.</string>
+
+    <!-- Notification strings added for android N -->
+    <string name="previous_channel">Previous</string>
+    <string name="stop_fm">Stop</string>
+    <string name="next_channel">Next</string>
 </resources>

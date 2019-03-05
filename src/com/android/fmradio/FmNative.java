@@ -151,4 +151,67 @@ public class FmNative {
      * @return (0, success; 1 failed; 2 not support)
      */
     static native int switchAntenna(int antenna);
+
+    // FM EM start
+    /**
+     * get rssi from hardware(use for engineer mode)
+     *
+     * @return rssi value
+     */
+    static native int readRssi();
+
+    /**
+     * Inquiry if fm stereo mono(true, stereo; false mono)
+     *
+     * @return (true, stereo; false, mono)
+     */
+    static native boolean stereoMono();
+
+    /**
+     * Force set to stero/mono mode
+     *
+     * @param isMono
+     *            (true, mono; false, stereo)
+     * @return (true, success; false, failed)
+     */
+    static native boolean setStereoMono(boolean isMono);
+
+    /**
+     * Read cap array of short antenna
+     *
+     * @return cap array value
+     */
+    static native short readCapArray();
+
+    /**
+     * read rds bler
+     *
+     * @return rds bler value
+     */
+    static native short readRdsBler();
+
+    /**
+     * send variables to native, and get some variables return.
+     * @param val send to native
+     * @return get value from native
+     */
+    static native short[] emcmd(short[] val);
+
+    /**
+     * set RSSI, desense RSSI, mute gain soft
+     * @param index flag which will execute
+     * (0:rssi threshold,1:desense rssi threshold,2: SGM threshold)
+     * @param value send to native
+     * @return execute ok or not
+     */
+    static native boolean emsetth(int index, int value);
+
+    /**
+     * get hardware version
+     *
+     * @return hardware version information array(0, ChipId; 1, EcoVersion; 2, PatchVersion; 3,
+     *         DSPVersion)
+     */
+    static native int[] getHardwareVersion();
+    // FM EM end
 }

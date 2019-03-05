@@ -34,6 +34,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.LayoutInflater;
@@ -191,6 +192,8 @@ public class FmScroller extends FrameLayout {
      * This method must be called inside the Activity's OnCreate.
      */
     public void initialize() {
+        Log.d(TAG, "initialize");
+
         mScrollView = (ScrollView) findViewById(R.id.content_scroller);
         mScrollViewChild = findViewById(R.id.favorite_container);
         mHeader = findViewById(R.id.main_header_parent);
@@ -217,7 +220,7 @@ public class FmScroller extends FrameLayout {
                     mEventListener.onPlay(mAdapter.getFrequency(position));
                 }
 
-                mMainHandler.removeCallbacks(null);
+                mMainHandler.removeCallbacksAndMessages(null);
                 mMainHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -253,6 +256,7 @@ public class FmScroller extends FrameLayout {
         final OnPreDrawListener listener = new OnPreDrawListener() {
             @Override
             public boolean onPreDraw() {
+                Log.d(TAG, "onPreDraw");
                 view.getViewTreeObserver().removeOnPreDrawListener(this);
                 runnable.run();
                 return drawNextFrame;
@@ -475,6 +479,16 @@ public class FmScroller extends FrameLayout {
         toolbarLayoutParams.height = height;
         mHeader.setLayoutParams(toolbarLayoutParams);
         updateHeaderTextAndButton();
+
+        /// M: [BUG ADD] Correct the layout in floating window @{
+        //MultiWindowProxy proxy = MultiWindowProxy.getInstance();
+        //if (proxy != null && proxy.isFeatureEnabled() && proxy.getFloatingState()) {
+            //if (height != getMaxHeight(STATE_HAS_FAVORITE)) {
+                //toolbarLayoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                //mHeader.setLayoutParams(toolbarLayoutParams);
+            //}
+        //}
+        /// @}
     }
 
     /**
@@ -649,7 +663,10 @@ public class FmScroller extends FrameLayout {
         }
     }
 
-    private void updateHeaderTextAndButton() {
+    /**
+     * update header text view attribute.
+     **/
+    public void updateHeaderTextAndButton() {
         mAdjuster.handleScroll();
     }
 
@@ -889,6 +906,8 @@ public class FmScroller extends FrameLayout {
      * Called when FmRadioActivity.onResume(), refresh layout
      */
     public void onResume() {
+        Log.d(TAG, "onResume, mFirstOnResume = " + mFirstOnResume);
+
         Cursor c = getData();
         mAdapter.swipResult(c);
         if (mFirstOnResume) {
@@ -965,7 +984,7 @@ public class FmScroller extends FrameLayout {
         refreshFavoriteLayout();
         if (c != null && c.getCount() == 0) {
             // Stop the play animation
-            mMainHandler.removeCallbacks(null);
+            mMainHandler.removeCallbacksAndMessages(null);
 
             // Last time count is 1, so need set STATE_NO_FAVORITE then expand header
             mMinimumHeaderHeight = getMinHeight(STATE_NO_FAVORITE);
@@ -1121,7 +1140,9 @@ public class FmScroller extends FrameLayout {
 
         public Adjuster(Context context) {
             mContext = context;
-            mDisplayMetrics = mContext.getResources().getDisplayMetrics();
+            //mDisplayMetrics = mContext.getResources().getDisplayMetrics();
+            // get method changed as the earlier method returns the app size in multi window mode
+            mDisplayMetrics = Resources.getSystem().getDisplayMetrics();
             mDensity = mDisplayMetrics.density;
             int curOrientation = getResources().getConfiguration().orientation;
             mIsLandscape = curOrientation == Configuration.ORIENTATION_LANDSCAPE;
@@ -1577,5 +1598,17 @@ public class FmScroller extends FrameLayout {
         TextView mStationFreq;
         TextView mStationName;
         View mPopupMenuAnchor;
+    }
+
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        if (getMaximumScrollableHeaderHeight() == 0) {
+            int height = MeasureSpec.getSize(heightMeasureSpec);
+            Log.d(TAG, "onMeasure, height = " + height);
+            refreshStateHeight();
+            setHeaderHeight(getMaximumScrollableHeaderHeight());
+            updateHeaderTextAndButton();
+            refreshFavoriteLayout();
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 }

@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOCAL_PATH:= $(call my-dir)
+ifneq ($(MTK_A1_FEATURE),yes) 
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := FMRadio_static
-LOCAL_SRC_FILES := $(filter-out src/com/android/fmradio/%Activity.java src/com/android/fmradio/dialogs/% src/com/android/fmradio/views/%, $(call all-java-files-under, src))
-LOCAL_RESOURCE_DIR = $(LOCAL_PATH)/res
-include $(BUILD_STATIC_JAVA_LIBRARY)
+LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
@@ -27,10 +23,9 @@ LOCAL_CERTIFICATE := platform
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
-LOCAL_PACKAGE_NAME := FMRadio
-
 LOCAL_PRIVATE_PLATFORM_APIS := true
-
+LOCAL_PACKAGE_NAME := FMRadio
+LOCAL_MODULE_OWNER := mtk
 LOCAL_JNI_SHARED_LIBRARIES := libfmjni
 
 LOCAL_PROGUARD_ENABLED := disabled
@@ -44,3 +39,5 @@ LOCAL_AAPT_FLAGS := --auto-add-overlay --extra-packages android.support.v7.cardv
 include $(BUILD_PACKAGE)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
+
+endif

@@ -21,13 +21,18 @@
 #undef LOG_TAG
 #endif
 #define LOG_TAG "FMLIB_JNI"
+#define FM_AF_THRESHOLD  -80
+#define UNUSED(x) (void)(x)
 
 static int g_idx = -1;
 extern struct fmr_ds fmr_data;
+static short g_CurrentRDS_PI;
 
 jboolean openDev(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_open_dev(g_idx); // if success, then ret = 0; else ret < 0
 
@@ -38,6 +43,8 @@ jboolean openDev(JNIEnv *env, jobject thiz)
 jboolean closeDev(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_close_dev(g_idx);
 
@@ -49,9 +56,11 @@ jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq)
 {
     int ret = 0;
     int tmp_freq;
+    UNUSED(env);
+    UNUSED(thiz);
 
     LOGI("%s, [freq=%d]\n", __func__, (int)freq);
-    tmp_freq = (int)(freq * 10);        //Eg, 87.5 * 10 --> 875
+    tmp_freq = (int)(freq * 100);        //Eg, 87.5 * 100 --> 8750
     ret = FMR_pwr_up(g_idx, tmp_freq);
 
     LOGD("%s, [ret=%d]\n", __func__, ret);
@@ -61,6 +70,8 @@ jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq)
 jboolean powerDown(JNIEnv *env, jobject thiz, jint type)
 {
     int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_pwr_down(g_idx, type);
 
@@ -68,14 +79,30 @@ jboolean powerDown(JNIEnv *env, jobject thiz, jint type)
     return ret?JNI_FALSE:JNI_TRUE;
 }
 
+jint readRssi(JNIEnv *env, jobject thiz)  //jint = int
+{
+    int ret = 0;
+    int rssi = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_rssi(g_idx, &rssi);
+
+    LOGD("%s, [ret=%d]\n", __func__, ret);
+    return rssi;
+}
+
 jboolean tune(JNIEnv *env, jobject thiz, jfloat freq)
 {
     int ret = 0;
     int tmp_freq;
+    UNUSED(env);
+    UNUSED(thiz);
 
-    tmp_freq = (int)(freq * 10);        //Eg, 87.5 * 10 --> 875
+    tmp_freq = (int)(freq * 100);        //Eg, 87.5 * 100 --> 8750
     ret = FMR_tune(g_idx, tmp_freq);
-
+    if (!ret)  /* clean global pi*/
+        g_CurrentRDS_PI = 0;
     LOGD("%s, [ret=%d]\n", __func__, ret);
     return ret?JNI_FALSE:JNI_TRUE;
 }
@@ -86,6 +113,8 @@ jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) //jboolean is
     int tmp_freq;
     int ret_freq;
     float val;
+    UNUSED(env);
+    UNUSED(thiz);
 
     tmp_freq = (int)(freq * 100);       //Eg, 87.55 * 100 --> 8755
     ret = FMR_set_mute(g_idx, 1);
@@ -113,6 +142,7 @@ jshortArray autoScan(JNIEnv *env, jobject thiz)
     jshortArray scanChlarray;
     int chl_cnt = FM_SCAN_CH_SIZE_MAX;
     uint16_t ScanTBL[FM_SCAN_CH_SIZE_MAX];
+    UNUSED(thiz);
 
     LOGI("%s, [tbl=%p]\n", __func__, ScanTBL);
     FMR_Pre_Search(g_idx);
@@ -143,19 +173,130 @@ out:
     return scanChlarray;
 }
 
+jboolean emsetth(JNIEnv *env, jobject thiz, jint index, jint value)
+{
+    int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_EMSetTH(g_idx, index, value);
+
+    LOGD("emsetth ret %d\n", ret);
+    return (ret < 0) ? JNI_FALSE : JNI_TRUE;
+}
+jshortArray emcmd(JNIEnv *env, jobject thiz, jshortArray val)
+{
+    jshortArray eventarray = NULL;
+    uint16_t eventtbl[20]={0};
+    uint16_t* cmdtbl=NULL;
+    UNUSED(thiz);
+
+    cmdtbl = (uint16_t*) env->GetShortArrayElements(val, NULL);
+    if(cmdtbl == NULL)
+    {
+        LOGE("%s:get cmdtbl error\n", __func__);
+        goto out;
+    }
+    LOGI("EM cmd:=%x %x %x %x %x",cmdtbl[0],cmdtbl[1],cmdtbl[2],cmdtbl[3],cmdtbl[4]);
+
+    if(!cmdtbl[0])  //LANT
+    {
+    }
+    else            //SANT
+    {
+    }
+
+    switch(cmdtbl[1])
+    {
+        case 0x02:  //CQI log tool
+        {
+            FMR_EM_CQI_logger(g_idx, cmdtbl[2]);
+        }
+            break;
+        default:
+            break;
+    }
+
+    eventarray = env->NewShortArray(20);
+    env->SetShortArrayRegion(eventarray, 0, 20, (const jshort*)&eventtbl[0]);
+    //LOGD("emsetth ret %d\n", ret);
+out:
+    return eventarray;
+}
+
 jshort readRds(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
-    uint16_t status = 0;
+    int rssi = -1;
+    uint16_t rds_status = 0;
+    uint16_t pi = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
-    ret = FMR_read_rds_data(g_idx, &status);
+    ret = FMR_read_rds_data(g_idx, &rds_status);
 
     if (ret) {
-        //LOGE("%s,status = 0,[ret=%d]\n", __func__, ret);
-        status = 0; //there's no event or some error happened
+        rds_status = 0;  // There's no event or some error happened
+    } else {
+        if (rds_status & RDS_EVENT_PI_CODE) {
+            ret = FMR_get_pi(0, &pi);
+            if (!ret) {
+                ret = FMR_get_rssi(g_idx, &rssi);
+                if (rssi > FM_AF_THRESHOLD)
+                    g_CurrentRDS_PI = pi;
+            }
+            LOGE("get pi(0x%04x) \n", pi);
+        }
     }
+    return rds_status;
+}
 
-    return status;
+jshort getPI(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    uint16_t pi = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_pi(g_idx, &pi);
+
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        pi = -1; //there's some error happened
+    }
+    return pi;
+}
+
+jbyte getECC(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    uint8_t ecc = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_ecc(g_idx, &ecc);
+
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        ecc = -1; //there's some error happened
+    }
+    return ecc;
+}
+
+jbyte getPTY(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    uint8_t pty = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_pty(g_idx, &pty);
+
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        pty = -1; //there's some error happened
+    }
+    return pty;
 }
 
 jbyteArray getPs(JNIEnv *env, jobject thiz)
@@ -164,6 +305,7 @@ jbyteArray getPs(JNIEnv *env, jobject thiz)
     jbyteArray PSname;
     uint8_t *ps = NULL;
     int ps_len = 0;
+    UNUSED(thiz);
 
     ret = FMR_get_ps(g_idx, &ps, &ps_len);
     if (ret) {
@@ -182,6 +324,7 @@ jbyteArray getLrText(JNIEnv *env, jobject thiz)
     jbyteArray LastRadioText;
     uint8_t *rt = NULL;
     int rt_len = 0;
+    UNUSED(thiz);
 
     ret = FMR_get_rt(g_idx, &rt, &rt_len);
     if (ret) {
@@ -198,13 +341,16 @@ jshort activeAf(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
     jshort ret_freq = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
-    ret = FMR_active_af(g_idx, (uint16_t*)&ret_freq);
+    ret = FMR_active_af(g_idx, g_CurrentRDS_PI, (uint16_t*)&ret_freq);
     if (ret) {
         LOGE("%s, error, [ret=%d]\n", __func__, ret);
         return 0;
     }
-    LOGD("%s, [ret=%d]\n", __func__, ret);
+
+    LOGD("%s, [ret=%d], ret_freq=%d\n", __func__, ret, ret_freq);
     return ret_freq;
 }
 
@@ -214,6 +360,7 @@ jshortArray getAFList(JNIEnv *env, jobject thiz)
     jshortArray AFList;
     char *af = NULL;
     int af_len = 0;
+    UNUSED(thiz);
 
     //ret = FMR_get_af(g_idx, &af, &af_len); // If need, we should implemate this API
     if (ret) {
@@ -226,10 +373,44 @@ jshortArray getAFList(JNIEnv *env, jobject thiz)
     return AFList;
 }
 
+jshort activeTA(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    jshort ret_freq = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_active_ta(g_idx, (uint16_t*)&ret_freq);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        return 0;
+    }
+    LOGD("%s, [ret=%d], ret_freq=%d\n", __func__, ret, ret_freq);
+    return ret_freq;
+}
+
+jshort deactiveTA(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    jshort ret_freq = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_deactive_ta(g_idx, (uint16_t*)&ret_freq);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        return 0;
+    }
+    LOGD("%s, [ret=%d], ret_freq=%d\n", __func__, ret, ret_freq);
+    return ret_freq;
+}
+
 jint setRds(JNIEnv *env, jobject thiz, jboolean rdson)
 {
     int ret = 0;
     int onoff = -1;
+    UNUSED(env);
+    UNUSED(thiz);
 
     if (rdson == JNI_TRUE) {
         onoff = FMR_RDS_ON;
@@ -247,6 +428,8 @@ jint setRds(JNIEnv *env, jobject thiz, jboolean rdson)
 jboolean stopScan(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_stop_scan(g_idx);
     if (ret) {
@@ -259,6 +442,8 @@ jboolean stopScan(JNIEnv *env, jobject thiz)
 jint setMute(JNIEnv *env, jobject thiz, jboolean mute)
 {
     int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_set_mute(g_idx, (int)mute);
     if (ret) {
@@ -266,6 +451,30 @@ jint setMute(JNIEnv *env, jobject thiz, jboolean mute)
     }
     LOGD("%s, [mute=%d] [ret=%d]\n", __func__, (int)mute, ret);
     return ret?JNI_FALSE:JNI_TRUE;
+}
+
+/******************************************
+ * Used to get chip ID.
+ *Parameter:
+ *	None
+ *Return value
+ *	1000: chip AR1000
+ *	6616: chip mt6616
+ *	-1: error
+ ******************************************/
+jint getchipid(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    int chipid = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+    
+    ret = FMR_get_chip_id(g_idx, &chipid);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+    LOGD("%s, [chipid=%x] [ret=%d]\n", __func__, chipid, ret);
+    return chipid;
 }
 
 /******************************************
@@ -281,6 +490,8 @@ jint isRdsSupport(JNIEnv *env, jobject thiz)
 {
     int ret = 0;
     int supt = -1;
+    UNUSED(env);
+    UNUSED(thiz);
 
     ret = FMR_is_rdsrx_support(g_idx, &supt);
     if (ret) {
@@ -291,6 +502,29 @@ jint isRdsSupport(JNIEnv *env, jobject thiz)
 }
 
 /******************************************
+ * Inquiry if FM is powered up.
+ * Parameter:
+ *	None
+ *Return Value:
+ *	1: Powered up
+ *	0: Did NOT powered up
+ ******************************************/
+jint isFMPoweredUp(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    int pwrup = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_is_fm_pwrup(g_idx, &pwrup);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+    LOGD("%s, [pwrup=%d] [ret=%d]\n", __func__, pwrup, ret);
+    return pwrup;
+}
+ /******************************************
+
  * SwitchAntenna
  * Parameter:
  *      antenna:
@@ -306,6 +540,8 @@ jint switchAntenna(JNIEnv *env, jobject thiz, jint antenna)
     int ret = 0;
     jint jret = 0;
     int ana = -1;
+    UNUSED(env);
+    UNUSED(thiz);
 
     if (0 == antenna) {
         ana = FM_LONG_ANA;
@@ -331,25 +567,153 @@ out:
     return jret;
 }
 
+/******************************************
+ * Inquiry if FM is stereoMono.
+ * Parameter:
+ *	None
+ *Return Value:
+ *	JNI_TRUE: stereo
+ *	JNI_FALSE: mono
+ ******************************************/
+jboolean stereoMono(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    int stemono = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_stereomono(g_idx, &stemono);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+    LOGD("%s, [stemono=%d] [ret=%d]\n", __func__, stemono, ret);
+
+    return stemono?JNI_TRUE:JNI_FALSE;
+}
+
+/******************************************
+ * Force set to stero/mono mode.
+ * Parameter:
+ *	type: JNI_TRUE, mono; JNI_FALSE, stero
+ *Return Value:
+ *	JNI_TRUE: success
+ *	JNI_FALSE: failed
+ ******************************************/
+jboolean setStereoMono(JNIEnv *env, jobject thiz, jboolean type)
+{
+    int ret = 0;
+    UNUSED(env);
+    UNUSED(thiz);
+    
+    ret = FMR_set_stereomono(g_idx, ((type == JNI_TRUE) ? 1 : 0));
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+    LOGD("%s,[ret=%d]\n", __func__, ret);
+
+    return (ret==0) ? JNI_TRUE : JNI_FALSE;
+}
+
+/******************************************
+ * Read cap array of short antenna.
+ * Parameter:
+ *	None
+ *Return Value:
+ *	CapArray
+ ******************************************/
+jshort readCapArray(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    int caparray = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_caparray(g_idx, &caparray);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+    LOGD("%s, [caparray=%d] [ret=%d]\n", __func__, caparray, ret);
+
+    return (jshort)caparray;
+}
+
+/******************************************
+ * Read cap array of short antenna.
+ * Parameter:
+ *	None
+ *Return Value:
+ *	CapArray : 0~100
+ ******************************************/
+jshort readRdsBler(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    int badratio = -1;
+    UNUSED(env);
+    UNUSED(thiz);
+
+    ret = FMR_get_badratio(g_idx, &badratio);
+    if(ret){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+    }
+
+    if(badratio > 100){
+        badratio = 100;
+        LOGW("badratio value error, give a max value!");
+    }else if(badratio < 0){
+        badratio = 0;
+        LOGW("badratio value error, give a min value!");
+    }
+    LOGD("%s, [badratio=%d] [ret=%d]\n", __func__, badratio, ret);
+
+    return (jshort)badratio;
+}
+
+jintArray getHardwareVersion(JNIEnv *env, jobject thiz)
+{
+    int ret = 0;
+    jintArray hw_info;
+    int *info = NULL;
+    int info_len = 0;
+    UNUSED(thiz);
+
+    ret = FMR_get_hw_info(g_idx, &info, &info_len);
+    if(ret < 0){
+        LOGE("%s, error, [ret=%d]\n", __func__, ret);
+        return NULL;
+    }
+    hw_info = env->NewIntArray(info_len);
+    env->SetIntArrayRegion(hw_info, 0, info_len, (const jint*)info);
+    LOGD("%s, [ret=%d]\n", __func__, ret);
+    return hw_info;
+}
+
 static const char *classPathNameRx = "com/android/fmradio/FmNative";
 
 static JNINativeMethod methodsRx[] = {
-    {"openDev", "()Z", (void*)openDev },  //1
-    {"closeDev", "()Z", (void*)closeDev }, //2
-    {"powerUp", "(F)Z", (void*)powerUp },  //3
-    {"powerDown", "(I)Z", (void*)powerDown }, //4
-    {"tune", "(F)Z", (void*)tune },          //5
-    {"seek", "(FZ)F", (void*)seek },         //6
-    {"autoScan",  "()[S", (void*)autoScan }, //7
-    {"stopScan",  "()Z", (void*)stopScan },  //8
-    {"setRds",    "(Z)I", (void*)setRds  },  //10
-    {"readRds",   "()S", (void*)readRds },  //11 will pending here for get event status
-    {"getPs",     "()[B", (void*)getPs  },  //12
-    {"getLrText", "()[B", (void*)getLrText}, //13
-    {"activeAf",  "()S", (void*)activeAf},   //14
-    {"setMute",	"(Z)I", (void*)setMute},  //15
-    {"isRdsSupport",	"()I", (void*)isRdsSupport},  //16
-    {"switchAntenna", "(I)I", (void*)switchAntenna}, //17
+    {"openDev", "()Z", (void*)openDev},
+    {"closeDev", "()Z", (void*)closeDev},
+    {"powerUp", "(F)Z", (void*)powerUp},
+    {"powerDown", "(I)Z", (void*)powerDown},
+    {"tune", "(F)Z", (void*)tune},
+    {"seek", "(FZ)F", (void*)seek},
+    {"autoScan",  "()[S", (void*)autoScan},
+    {"stopScan",  "()Z", (void*)stopScan},
+    {"setRds",    "(Z)I", (void*)setRds},
+    {"readRds",   "()S", (void*)readRds},
+    {"getPs",     "()[B", (void*)getPs},
+    {"getLrText", "()[B", (void*)getLrText},
+    {"activeAf",  "()S", (void*)activeAf},
+    {"setMute", "(Z)I", (void*)setMute},
+    {"isRdsSupport",    "()I", (void*)isRdsSupport},
+    {"switchAntenna", "(I)I", (void*)switchAntenna},
+    {"readRssi",   "()I", (void*)readRssi},
+    {"stereoMono", "()Z", (void*)stereoMono},
+    {"setStereoMono", "(Z)Z", (void*)setStereoMono},
+    {"readCapArray", "()S", (void*)readCapArray},
+    {"readRdsBler", "()S", (void*)readRdsBler},
+    {"emcmd","([S)[S",(void*)emcmd},
+    {"emsetth","(II)Z",(void*)emsetth},
+    {"getHardwareVersion", "()[I", (void*)getHardwareVersion},
 };
 
 /*
@@ -413,6 +777,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     uenv.venv = NULL;
     jint result = -1;
     JNIEnv* env = NULL;
+    UNUSED(reserved);
 
     LOGI("JNI_OnLoad");
 

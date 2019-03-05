@@ -130,6 +130,7 @@ struct fm_tune_parm {
     uint8_t band;
     uint8_t space;
     uint8_t hilo;
+    uint8_t deemphasis;
     uint16_t freq;
 };
 
@@ -282,13 +283,13 @@ typedef struct {
 struct rds_raw_data {
     int dirty; // indicate if the data changed or not
     int len; // the data len form chip
-    uint8_t data[146];
+    uint8_t data[148];
 };
 
 struct rds_group_cnt {
-    unsigned long total;
-    unsigned long groupA[16]; // RDS groupA counter
-    unsigned long groupB[16]; // RDS groupB counter
+    unsigned int total;
+    unsigned int groupA[16]; // RDS groupA counter
+    unsigned int groupB[16]; // RDS groupB counter
 };
 
 enum rds_group_cnt_opcode {
@@ -348,6 +349,7 @@ typedef enum {
     RDS_EVENT_AFON_LIST      = 0x0200, // An alternative frequency list is ready
     RDS_EVENT_TAON           = 0x0400,  // Other Network traffic announcement start
     RDS_EVENT_TAON_OFF       = 0x0800, // Other Network traffic announcement finished.
+    RDS_EVENT_ECC_CODE       = 0x1000, /* ECC code */
     RDS_EVENT_RDS            = 0x2000, // RDS Interrupt had arrived durint timer period
     RDS_EVENT_NO_RDS         = 0x4000, // RDS Interrupt not arrived durint timer period
     RDS_EVENT_RDS_TIMER      = 0x8000 // Timer for RDS Bler Check. ---- BLER  block error rate
@@ -435,7 +437,6 @@ typedef struct {
 
 // ********** ***********FM IOCTL define start *******************************
 #define FM_IOC_MAGIC        0xf5
-
 #define FM_IOCTL_POWERUP       _IOWR(FM_IOC_MAGIC, 0, struct fm_tune_parm*)
 #define FM_IOCTL_POWERDOWN     _IOWR(FM_IOC_MAGIC, 1, int32_t*)
 #define FM_IOCTL_TUNE          _IOWR(FM_IOC_MAGIC, 2, struct fm_tune_parm*)
@@ -505,7 +506,6 @@ typedef struct {
 #define FM_IOCTL_FULL_CQI_LOG _IOWR(FM_IOC_MAGIC, 70, fm_full_cqi_log_t *)
 
 #define FM_IOCTL_DUMP_REG   _IO(FM_IOC_MAGIC, 0xFF)
-
 // ********** ***********FM IOCTL define end *******************************
 
 enum group_idx {
